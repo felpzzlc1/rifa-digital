@@ -1,10 +1,13 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 import { z } from 'zod';
 import prisma from '../lib/prisma';
 
 const router = Router();
+
+const JWT_SECRET = process.env.JWT_SECRET || 'default-secret-key';
+const JWT_EXPIRES = process.env.JWT_EXPIRES_IN || '7d';
 
 const registerSchema = z.object({
   email: z.string().email(),
@@ -53,8 +56,8 @@ router.post('/register', async (req, res) => {
         email: user.email,
         empresaId: user.empresaId
       },
-      process.env.JWT_SECRET || 'default-secret',
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRES } as SignOptions
     );
 
     res.json({
@@ -104,8 +107,8 @@ router.post('/login', async (req, res) => {
         email: user.email,
         empresaId: user.empresaId
       },
-      process.env.JWT_SECRET || 'default-secret',
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRES } as SignOptions
     );
 
     res.json({
