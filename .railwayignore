@@ -1,7 +1,62 @@
-node_modules
+# Railway ignore - Frontend
+# Railway usa Nixpacks, não Docker
+
+# Docker (mantido apenas para dev local)
+Dockerfile
+docker-compose.yml
+nginx.conf
+
+# Dependências
+node_modules/
+.pnp
+.pnp.js
+
+# Testes
+coverage/
+*.test.js
+*.test.ts
+*.spec.js
+*.spec.ts
+
+# Builds e cache
+.cache/
+dist/
+build/
+.vite/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Git
+.git/
+.gitignore
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
 .env
 .env.local
-*.log
-.DS_Store
-build
-dist
+.env.example
+.env.development
+
+# Documentação (não necessária no deploy)
+*.md
+!README.md
+guidelines/
+src/guidelines/
+
+# Backend (será deployado separadamente)
+backend/
