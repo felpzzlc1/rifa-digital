@@ -2,6 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import prisma from '../lib/prisma';
+import { Prisma } from '@prisma/client';
 
 const router = Router();
 
@@ -62,7 +63,7 @@ router.post('/create', masterAdminMiddleware, async (req, res) => {
     const hashedPassword = await bcrypt.hash(data.adminPassword, 10);
 
     // Criar Tenant + Admin em uma transação
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // 1. Criar Tenant (Empresa)
       const empresa = await tx.empresa.create({
         data: {
