@@ -1,5 +1,6 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// ==========================================================
+// PRISMA - CONFIGURAÇÃO GERAL
+// ==========================================================
 
 generator client {
   provider = "prisma-client-js"
@@ -10,163 +11,237 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
+// ==========================================================
+// EMPRESA (Tenant)
+// Cada registro é uma empresa que usa o sistema.
+// ==========================================================
+model Empresa {
+  id           String    @id @default(uuid())
+  nome         String              // Nome da empresa
+  slug         String    @unique   // Identificador único (ex: "distribuidora-abc")
+  documento    String?   @unique   // CNPJ da empresa
+  email        String?             // E-mail de contato
+  telefone     String?             // Telefone de contato
+  ativa        Boolean   @default(true)       // Empresa ativa/inativa
+  plano        String    @default("basico")   // Plano: basico, premium, enterprise
+  expiraEm     DateTime?           // Data de expiração do plano (se houver)
+  criadoEm     DateTime  @default(now())
+  atualizadoEm DateTime  @updatedAt
+
+  // Relações
+  usuarios     Usuario[]
+  produtos     Produto[]
+  clientes     Cliente[]
+  vendedores   Vendedor[]
+  fornecedores Fornecedor[]
+  pedidos      Pedido[]
+  rotas        Rota[]
+}
+
+// ==========================================================
+// USUÁRIO DO SISTEMA
+// ==========================================================
+model Usuario {
+  id           String    @id @default(uuid())
+  empresaId    String              // Empresa à qual o usuário pertence
+  email        String              // E-mail de login
+  senha        String              // Senha (hash)
+  nome         String              // Nome do usuário
+  papel        String    @default("usuario") // admin, vendedor, usuario
+  criadoEm     DateTime  @default(now())
+  atualizadoEm DateTime  @updatedAt
+
+  empresa      Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  pedidos      Pedido[]
+
+  @@unique([empresaId, email]) // E-mail único dentro da mesma empresa
+  @@index([empresaId])
+}
+
+// ==========================================================
+// PRODUTO
+// ==========================================================
+model Produto {
+  id             String    @id @default(uuid())
+  empresaId      String              // Empresa dona do produto
+  nome           String              // Nome do produto
+  descricao      String?             // Descrição opcional
+  preco          Float               // Preço unitário
+  estoque        Int       @default(0)  // Estoque atual
+  imagem         String?             // URL da imagem
+  categoria      String?             // Categoria (ex: bebidas, alimentos)
+  codigoBarras   String?             // Código de barras
+  fornecedorId   String?             // Fornecedor principal (opcional)
+  criadoEm       DateTime  @default(now())
+  atualizadoEm   DateTime  @updatedAt
+
+  empresa        Empresa       @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  fornecedor     Fornecedor?   @relation(fields: [fornecedorId], references: [id])
+  itensPedido    ItemPedido[]
+  produtosRota   RotaProduto[]
+
+  @@index([empresaId])
+  @@index([empresaId, categoria])
+}
+
+// ==========================================================
+// CLIENTE FINAL
+// ==========================================================
+model Cliente {
+  id           String    @id @default(uuid())
+  empresaId    String              // Empresa dona do cadastro
+  nome         String              // Nome/Razão social
+  email        String?             // E-mail de contato
+  telefone     String?             // Telefone
+  endereco     String?             // Endereço (texto simples)
+  documento    String?             // CPF/CNPJ
+  observacoes  String?             // Observações gerais
+  criadoEm     DateTime  @default(now())
+  atualizadoEm DateTime  @updatedAt
+
+  empresa      Empresa       @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  pedidos      Pedido[]
+  rotas        RotaCliente[]
+
+  @@unique([empresaId, documento]) // Documento único por empresa
+  @@index([empresaId])
+}
+
+// ==========================================================
+// VENDEDOR EXTERNO
+// ==========================================================
+model Vendedor {
+  id           String    @id @default(uuid())
+  empresaId    String              // Empresa do vendedor
+  nome         String              // Nome do vendedor
+  email        String?             // E-mail
+  telefone     String?             // Telefone
+  documento    String?             // CPF
+  comissao     Float     @default(0) // Percentual de comissão (%)
+  criadoEm     DateTime  @default(now())
+  atualizadoEm DateTime  @updatedAt
+
+  empresa      Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  pedidos      Pedido[]
+  rotas        Rota[]
+
+  @@unique([empresaId, documento]) // CPF único por empresa
+  @@index([empresaId])
+}
+
+// ==========================================================
+// FORNECEDOR
+// ==========================================================
+model Fornecedor {
+  id           String    @id @default(uuid())
+  empresaId    String              // Empresa que cadastrou o fornecedor
+  nome         String              // Nome/Razão social
+  email        String?             // E-mail
+  telefone     String?             // Telefone
+  endereco     String?             // Endereço
+  documento    String?             // CNPJ
+  observacoes  String?             // Observações
+  criadoEm     DateTime  @default(now())
+  atualizadoEm DateTime  @updatedAt
+
+  empresa      Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  produtos     Produto[]
+
+  @@unique([empresaId, documento]) // CNPJ único por empresa
+  @@index([empresaId])
+}
+
+// ==========================================================
+// PEDIDO DE VENDA
+// ==========================================================
+model Pedido {
+  id               String    @id @default(uuid())
+  empresaId        String              // Empresa dona do pedido
+  numeroPedido     String              // Número do pedido (sequencial por empresa)
+  clienteId        String              // Cliente
+  vendedorId       String?             // Vendedor (opcional)
+  usuarioId        String              // Usuário interno que registrou o pedido
+  status           String    @default("pendente") // pendente, concluido, cancelado
+  formaPagamento   String              // dinheiro, credito, debito, pix
+  statusPagamento  String    @default("pendente") // pendente, pago, em_atraso
+  venceEm          DateTime?           // Vencimento (se a prazo)
+  pagoEm           DateTime?           // Data de pagamento
+  total            Float               // Valor total do pedido
+  observacoes      String?             // Observações
+  criadoEm         DateTime  @default(now())
+  atualizadoEm     DateTime  @updatedAt
+
+  empresa          Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  cliente          Cliente   @relation(fields: [clienteId], references: [id])
+  vendedor         Vendedor? @relation(fields: [vendedorId], references: [id])
+  usuario          Usuario   @relation(fields: [usuarioId], references: [id])
+  itens            ItemPedido[]
+
+  @@unique([empresaId, numeroPedido]) // Número de pedido único por empresa
+  @@index([empresaId])
+  @@index([empresaId, status])
+}
+
+// ==========================================================
+// ITEM DO PEDIDO
+// ==========================================================
+model ItemPedido {
+  id         String   @id @default(uuid())
+  pedidoId   String           // Pedido
+  produtoId  String           // Produto
+  quantidade Int              // Quantidade vendida
+  preco      Float            // Preço unitário no momento da venda
+  subtotal   Float            // quantidade * preço
+
+  pedido     Pedido  @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  produto    Produto @relation(fields: [produtoId], references: [id])
+}
+
+// ==========================================================
+// ROTA DE ATENDIMENTO
+// ==========================================================
+model Rota {
+  id           String    @id @default(uuid())
+  empresaId    String              // Empresa dona da rota
+  nome         String              // Nome da rota (ex: "Rota Centro")
+  cor          String?             // Cor para exibir na UI
+  vendedorId   String?             // Vendedor responsável pela rota
+  observacoes  String?             // Observações
+  criadoEm     DateTime  @default(now())
+  atualizadoEm DateTime  @updatedAt
+
+  empresa      Empresa       @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  vendedor     Vendedor?     @relation(fields: [vendedorId], references: [id])
+  clientes     RotaCliente[]
+  produtos     RotaProduto[]
+
+  @@index([empresaId])
+}
+
+// ==========================================================
+// CLIENTES POR ROTA (N:N)
+// ==========================================================
+model RotaCliente {
   id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  name      String
-  role      String   @default("user") // admin, seller, user
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  orders    Order[]
-  
-  @@map("users")
+  rotaId    String           // Rota
+  clienteId String           // Cliente
+
+  rota      Rota    @relation(fields: [rotaId], references: [id], onDelete: Cascade)
+  cliente   Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  @@unique([rotaId, clienteId])  // Cliente não pode se repetir na mesma rota
 }
 
-model Product {
-  id          String   @id @default(uuid())
-  name        String
-  description String?
-  price       Float
-  stock       Int      @default(0)
-  image       String?
-  category    String?
-  barcode     String?
-  supplierId  String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  supplier    Supplier?     @relation(fields: [supplierId], references: [id])
-  orderItems  OrderItem[]
-  routeProducts RouteProduct[]
-  
-  @@map("products")
-}
+// ==========================================================
+// PRODUTOS POR ROTA (N:N)
+// ==========================================================
+model RotaProduto {
+  id         String   @id @default(uuid())
+  rotaId     String           // Rota
+  produtoId  String           // Produto
 
-model Client {
-  id        String   @id @default(uuid())
-  name      String
-  email     String?
-  phone     String?
-  address   String?
-  document  String?  @unique // CPF/CNPJ
-  notes     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  orders    Order[]
-  routes    RouteClient[]
-  
-  @@map("clients")
-}
+  rota       Rota    @relation(fields: [rotaId], references: [id], onDelete: Cascade)
+  produto    Produto @relation(fields: [produtoId], references: [id], onDelete: Cascade)
 
-model Seller {
-  id        String   @id @default(uuid())
-  name      String
-  email     String?  @unique
-  phone     String?
-  document  String?  @unique // CPF
-  commission Float   @default(0) // Percentual de comissão
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  orders    Order[]
-  routes    Route[]
-  
-  @@map("sellers")
-}
-
-model Supplier {
-  id        String   @id @default(uuid())
-  name      String
-  email     String?
-  phone     String?
-  address   String?
-  document  String?  @unique // CNPJ
-  notes     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  products  Product[]
-  
-  @@map("suppliers")
-}
-
-model Order {
-  id            String   @id @default(uuid())
-  orderNumber   String   @unique
-  clientId      String
-  sellerId      String?
-  userId        String
-  status        String   @default("pending") // pending, completed, cancelled
-  paymentMethod String   // cash, credit, debit, pix
-  paymentStatus String   @default("pending") // pending, paid, overdue
-  dueDate       DateTime?
-  paidAt        DateTime?
-  total         Float
-  notes         String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
-  client        Client   @relation(fields: [clientId], references: [id])
-  seller        Seller?  @relation(fields: [sellerId], references: [id])
-  user          User     @relation(fields: [userId], references: [id])
-  items         OrderItem[]
-  
-  @@map("orders")
-}
-
-model OrderItem {
-  id        String   @id @default(uuid())
-  orderId   String
-  productId String
-  quantity  Int
-  price     Float
-  subtotal  Float
-  
-  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product   Product  @relation(fields: [productId], references: [id])
-  
-  @@map("order_items")
-}
-
-model Route {
-  id        String   @id @default(uuid())
-  name      String
-  color     String?
-  sellerId  String?
-  notes     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  seller    Seller?  @relation(fields: [sellerId], references: [id])
-  clients   RouteClient[]
-  products  RouteProduct[]
-  
-  @@map("routes")
-}
-
-model RouteClient {
-  id        String   @id @default(uuid())
-  routeId   String
-  clientId  String
-  
-  route     Route    @relation(fields: [routeId], references: [id], onDelete: Cascade)
-  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  
-  @@unique([routeId, clientId])
-  @@map("route_clients")
-}
-
-model RouteProduct {
-  id        String   @id @default(uuid())
-  routeId   String
-  productId String
-  
-  route     Route    @relation(fields: [routeId], references: [id], onDelete: Cascade)
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  
-  @@unique([routeId, productId])
-  @@map("route_products")
+  @@unique([rotaId, produtoId]) // Produto não se repete na mesma rota
 }

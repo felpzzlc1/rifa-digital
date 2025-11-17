@@ -11,6 +11,7 @@ dotenv.config();
 import authRoutes from './routes/auth';
 import productsRoutes from './routes/products';
 import ordersRoutes from './routes/orders';
+import tenantRoutes from './routes/tenants';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -33,6 +34,7 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productsRoutes);
 app.use('/api/orders', ordersRoutes);
+app.use('/api/tenants', tenantRoutes); // ← Rotas de gerenciamento de empresas (admin)
 
 // Rota de health check
 app.get('/health', (req, res) => {
@@ -48,6 +50,7 @@ app.get('/', (req, res) => {
       auth: '/api/auth',
       products: '/api/products',
       orders: '/api/orders',
+      tenants: '/api/tenants (admin only)',
       health: '/health',
     }
   });

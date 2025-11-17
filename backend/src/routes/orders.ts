@@ -25,7 +25,7 @@ router.get('/', authMiddleware, async (req: AuthRequest, res) => {
   try {
     const orders = await prisma.order.findMany({
       where: {
-        userId: req.userId,
+        tenantId: req.tenantId, // ← Filtro por tenant
       },
       include: {
         client: true,
@@ -53,7 +53,7 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res) => {
     const order = await prisma.order.findFirst({
       where: {
         id: req.params.id,
-        userId: req.userId,
+        tenantId: req.tenantId, // ← Garantir que o pedido pertence ao tenant
       },
       include: {
         client: true,
@@ -92,13 +92,16 @@ router.post('/', authMiddleware, async (req: AuthRequest, res) => {
       };
     });
 
-    // Gerar número do pedido
-    const orderCount = await prisma.order.count();
+    // Gerar número do pedido (por tenant)
+    const orderCount = await prisma.order.count({
+      where: { tenantId: req.tenantId },
+    });
     const orderNumber = `PED${String(orderCount + 1).padStart(6, '0')}`;
 
     const order = await prisma.order.create({
       data: {
         orderNumber,
+        tenantId: req.tenantId!, // ← Associar ao tenant
         userId: req.userId!,
         clientId: data.clientId,
         sellerId: data.sellerId,
@@ -134,6 +137,15 @@ router.post('/', authMiddleware, async (req: AuthRequest, res) => {
 router.patch('/:id/status', authMiddleware, async (req: AuthRequest, res) => {
   try {
     const { status } = req.body;
+
+    // Verificar se pedido pertence ao tenant antes de atualizar
+    const existing = await prisma.order.findFirst({
+      where: { id: req.params.id, tenantId: req.tenantId },
+    });
+
+    if (!existing) {
+      return res.status(404).json({ error: 'Pedido não encontrado' });
+    }
 
     const order = await prisma.order.update({
       where: { id: req.params.id },
