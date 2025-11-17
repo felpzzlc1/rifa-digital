@@ -53,7 +53,7 @@ router.post('/register', async (req, res) => {
         email: user.email,
         empresaId: user.empresaId
       },
-      process.env.JWT_SECRET!,
+      process.env.JWT_SECRET || 'default-secret',
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );
 
@@ -104,7 +104,7 @@ router.post('/login', async (req, res) => {
         email: user.email,
         empresaId: user.empresaId
       },
-      process.env.JWT_SECRET!,
+      process.env.JWT_SECRET || 'default-secret',
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );
 

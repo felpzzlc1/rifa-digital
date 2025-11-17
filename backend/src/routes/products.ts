@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import prisma from '../lib/prisma';
-import { authMiddleware } from '../middlewares/auth';
+import { authMiddleware, AuthRequest } from '../middlewares/auth';
 
 const router = Router();
 
@@ -16,7 +16,7 @@ const productSchema = z.object({
 });
 
 // Listar produtos
-router.get('/', authMiddleware, async (req, res) => {
+router.get('/', authMiddleware, async (req: AuthRequest, res) => {
   try {
     const products = await prisma.produto.findMany({
       where: { 
@@ -37,7 +37,7 @@ router.get('/', authMiddleware, async (req, res) => {
 });
 
 // Buscar produto por ID
-router.get('/:id', authMiddleware, async (req, res) => {
+router.get('/:id', authMiddleware, async (req: AuthRequest, res) => {
   try {
     const product = await prisma.produto.findFirst({
       where: { 
@@ -60,7 +60,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
 });
 
 // Criar produto
-router.post('/', authMiddleware, async (req, res) => {
+router.post('/', authMiddleware, async (req: AuthRequest, res) => {
   try {
     const data = productSchema.parse(req.body);
 
@@ -84,7 +84,7 @@ router.post('/', authMiddleware, async (req, res) => {
 });
 
 // Atualizar produto
-router.put('/:id', authMiddleware, async (req, res) => {
+router.put('/:id', authMiddleware, async (req: AuthRequest, res) => {
   try {
     const data = productSchema.partial().parse(req.body);
 
@@ -114,7 +114,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
 });
 
 // Deletar produto
-router.delete('/:id', authMiddleware, async (req, res) => {
+router.delete('/:id', authMiddleware, async (req: AuthRequest, res) => {
   try {
     const existing = await prisma.produto.findFirst({
       where: { id: req.params.id, empresaId: req.empresaId },
