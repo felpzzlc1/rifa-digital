@@ -15,7 +15,7 @@ const createTenantSchema = z.object({
   companyDocument: z.string().optional(), // CNPJ
   companyEmail: z.string().email().optional(),
   companyPhone: z.string().optional(),
-  plan: z.enum(['basic', 'premium', 'enterprise']).default('basic'),
+  plan: z.enum(['basico', 'premium', 'enterprise']).default('basico'),
   expiresAt: z.string().optional(), // Data de expiração (ISO string)
   
   // Dados do Admin da Empresa
@@ -41,7 +41,7 @@ router.post('/create', masterAdminMiddleware, async (req, res) => {
     const data = createTenantSchema.parse(req.body);
 
     // Verificar se slug já existe
-    const existingTenant = await prisma.tenant.findUnique({
+    const existingTenant = await prisma.empresa.findUnique({
       where: { slug: data.companySlug },
     });
 
@@ -50,7 +50,7 @@ router.post('/create', masterAdminMiddleware, async (req, res) => {
     }
 
     // Verificar se email do admin já existe (global)
-    const existingUser = await prisma.user.findFirst({
+    const existingUser = await prisma.usuario.findFirst({
       where: { email: data.adminEmail },
     });
 
@@ -64,47 +64,47 @@ router.post('/create', masterAdminMiddleware, async (req, res) => {
     // Criar Tenant + Admin em uma transação
     const result = await prisma.$transaction(async (tx) => {
       // 1. Criar Tenant (Empresa)
-      const tenant = await tx.tenant.create({
+      const empresa = await tx.empresa.create({
         data: {
-          name: data.companyName,
+          nome: data.companyName,
           slug: data.companySlug,
-          document: data.companyDocument,
+          documento: data.companyDocument,
           email: data.companyEmail,
-          phone: data.companyPhone,
-          plan: data.plan,
-          expiresAt: data.expiresAt ? new Date(data.expiresAt) : null,
-          active: true,
+          telefone: data.companyPhone,
+          plano: data.plan,
+          expiraEm: data.expiresAt ? new Date(data.expiresAt) : null,
+          ativa: true,
         },
       });
 
       // 2. Criar Admin do Tenant
-      const admin = await tx.user.create({
+      const admin = await tx.usuario.create({
         data: {
-          tenantId: tenant.id,
+          empresaId: empresa.id,
           email: data.adminEmail,
-          password: hashedPassword,
-          name: data.adminName,
-          role: 'admin',
+          senha: hashedPassword,
+          nome: data.adminName,
+          papel: 'admin',
         },
       });
 
-      return { tenant, admin };
+      return { empresa, admin };
     });
 
     res.status(201).json({
       message: 'Tenant criado com sucesso!',
       tenant: {
-        id: result.tenant.id,
-        name: result.tenant.name,
-        slug: result.tenant.slug,
-        plan: result.tenant.plan,
-        active: result.tenant.active,
+        id: result.empresa.id,
+        nome: result.empresa.nome,
+        slug: result.empresa.slug,
+        plano: result.empresa.plano,
+        ativa: result.empresa.ativa,
       },
       admin: {
         id: result.admin.id,
-        name: result.admin.name,
+        nome: result.admin.nome,
         email: result.admin.email,
-        role: result.admin.role,
+        papel: result.admin.papel,
       },
     });
   } catch (error) {
@@ -119,19 +119,19 @@ router.post('/create', masterAdminMiddleware, async (req, res) => {
 // ✅ LISTAR TODOS OS TENANTS (Para você ver)
 router.get('/list', masterAdminMiddleware, async (req, res) => {
   try {
-    const tenants = await prisma.tenant.findMany({
+    const tenants = await prisma.empresa.findMany({
       include: {
         _count: {
           select: {
-            users: true,
-            products: true,
-            orders: true,
-            clients: true,
+            usuarios: true,
+            produtos: true,
+            pedidos: true,
+            clientes: true,
           },
         },
       },
       orderBy: {
-        createdAt: 'desc',
+        criadoEm: 'desc',
       },
     });
 
@@ -146,19 +146,19 @@ router.patch('/:id/toggle', masterAdminMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
 
-    const tenant = await prisma.tenant.findUnique({ where: { id } });
+    const tenant = await prisma.empresa.findUnique({ where: { id } });
 
     if (!tenant) {
       return res.status(404).json({ error: 'Tenant não encontrado' });
     }
 
-    const updated = await prisma.tenant.update({
+    const updated = await prisma.empresa.update({
       where: { id },
-      data: { active: !tenant.active },
+      data: { ativa: !tenant.ativa },
     });
 
     res.json({
-      message: `Tenant ${updated.active ? 'ativado' : 'desativado'}`,
+      message: `Tenant ${updated.ativa ? 'ativado' : 'desativado'}`,
       tenant: updated,
     });
   } catch (error) {
@@ -172,11 +172,11 @@ router.patch('/:id/plan', masterAdminMiddleware, async (req, res) => {
     const { id } = req.params;
     const { plan, expiresAt } = req.body;
 
-    const updated = await prisma.tenant.update({
+    const updated = await prisma.empresa.update({
       where: { id },
       data: {
-        plan,
-        expiresAt: expiresAt ? new Date(expiresAt) : null,
+        plano: plan,
+        expiraEm: expiresAt ? new Date(expiresAt) : null,
       },
     });
 
@@ -195,7 +195,7 @@ router.delete('/:id', masterAdminMiddleware, async (req, res) => {
     const { id } = req.params;
 
     // Cascade vai deletar todos os dados relacionados
-    await prisma.tenant.delete({ where: { id } });
+    await prisma.empresa.delete({ where: { id } });
 
     res.json({ message: 'Tenant deletado com sucesso' });
   } catch (error) {

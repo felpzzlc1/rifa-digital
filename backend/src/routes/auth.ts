@@ -20,16 +20,16 @@ const loginSchema = z.object({
 // Registro
 router.post('/register', async (req, res) => {
   try {
-    const { email, password, name, tenantId } = req.body;
+    const { email, password, name, empresaId } = req.body;
 
-    // Verificar se tenant existe e está ativo
-    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
-    if (!tenant || !tenant.active) {
+    // Verificar se empresa existe e está ativa
+    const empresa = await prisma.empresa.findUnique({ where: { id: empresaId } });
+    if (!empresa || !empresa.ativa) {
       return res.status(400).json({ error: 'Empresa não encontrada ou inativa' });
     }
 
-    const existingUser = await prisma.user.findFirst({
-      where: { tenantId, email },
+    const existingUser = await prisma.usuario.findFirst({
+      where: { empresaId, email },
     });
     
     if (existingUser) {
@@ -38,12 +38,12 @@ router.post('/register', async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const user = await prisma.user.create({
+    const user = await prisma.usuario.create({
       data: {
-        tenantId,
+        empresaId,
         email,
-        password: hashedPassword,
-        name,
+        senha: hashedPassword,
+        nome: name,
       },
     });
 
@@ -51,7 +51,7 @@ router.post('/register', async (req, res) => {
       { 
         userId: user.id, 
         email: user.email,
-        tenantId: user.tenantId  // ← NOVO!
+        empresaId: user.empresaId
       },
       process.env.JWT_SECRET!,
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
@@ -61,8 +61,8 @@ router.post('/register', async (req, res) => {
       user: {
         id: user.id,
         email: user.email,
-        name: user.name,
-        tenantId: user.tenantId,
+        nome: user.nome,
+        empresaId: user.empresaId,
       },
       token,
     });
@@ -79,21 +79,21 @@ router.post('/login', async (req, res) => {
   try {
     const { email, password } = loginSchema.parse(req.body);
 
-    const user = await prisma.user.findFirst({ 
+    const user = await prisma.usuario.findFirst({ 
       where: { email },
-      include: { tenant: true }
+      include: { empresa: true }
     });
     
     if (!user) {
       return res.status(401).json({ error: 'Credenciais inválidas' });
     }
 
-    // Verificar se tenant está ativo
-    if (!user.tenant.active) {
+    // Verificar se empresa está ativa
+    if (!user.empresa.ativa) {
       return res.status(401).json({ error: 'Empresa inativa. Entre em contato com o suporte.' });
     }
 
-    const isPasswordValid = await bcrypt.compare(password, user.password);
+    const isPasswordValid = await bcrypt.compare(password, user.senha);
     if (!isPasswordValid) {
       return res.status(401).json({ error: 'Credenciais inválidas' });
     }
@@ -102,7 +102,7 @@ router.post('/login', async (req, res) => {
       { 
         userId: user.id, 
         email: user.email,
-        tenantId: user.tenantId  // ← NOVO!
+        empresaId: user.empresaId
       },
       process.env.JWT_SECRET!,
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
@@ -112,14 +112,14 @@ router.post('/login', async (req, res) => {
       user: {
         id: user.id,
         email: user.email,
-        name: user.name,
-        role: user.role,
-        tenantId: user.tenantId,
-        tenant: {
-          id: user.tenant.id,
-          name: user.tenant.name,
-          slug: user.tenant.slug,
-          plan: user.tenant.plan,
+        nome: user.nome,
+        papel: user.papel,
+        empresaId: user.empresaId,
+        empresa: {
+          id: user.empresa.id,
+          nome: user.empresa.nome,
+          slug: user.empresa.slug,
+          plano: user.empresa.plano,
         }
       },
       token,

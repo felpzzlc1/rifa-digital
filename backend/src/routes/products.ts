@@ -6,27 +6,27 @@ import { authMiddleware } from '../middlewares/auth';
 const router = Router();
 
 const productSchema = z.object({
-  name: z.string().min(1),
-  description: z.string().optional(),
-  price: z.number().positive(),
-  stock: z.number().int().min(0),
-  category: z.string().optional(),
-  barcode: z.string().optional(),
-  supplierId: z.string().optional(),
+  nome: z.string().min(1),
+  descricao: z.string().optional(),
+  preco: z.number().positive(),
+  estoque: z.number().int().min(0),
+  categoria: z.string().optional(),
+  codigoBarras: z.string().optional(),
+  fornecedorId: z.string().optional(),
 });
 
 // Listar produtos
 router.get('/', authMiddleware, async (req, res) => {
   try {
-    const products = await prisma.product.findMany({
+    const products = await prisma.produto.findMany({
       where: { 
-        tenantId: req.tenantId // ← Filtro por tenant
+        empresaId: req.empresaId
       },
       include: {
-        supplier: true,
+        fornecedor: true,
       },
       orderBy: {
-        name: 'asc',
+        nome: 'asc',
       },
     });
 
@@ -39,13 +39,13 @@ router.get('/', authMiddleware, async (req, res) => {
 // Buscar produto por ID
 router.get('/:id', authMiddleware, async (req, res) => {
   try {
-    const product = await prisma.product.findFirst({
+    const product = await prisma.produto.findFirst({
       where: { 
         id: req.params.id,
-        tenantId: req.tenantId // ← Garantir que o produto pertence ao tenant
+        empresaId: req.empresaId
       },
       include: {
-        supplier: true,
+        fornecedor: true,
       },
     });
 
@@ -64,13 +64,13 @@ router.post('/', authMiddleware, async (req, res) => {
   try {
     const data = productSchema.parse(req.body);
 
-    const product = await prisma.product.create({
+    const product = await prisma.produto.create({
       data: {
         ...data,
-        tenantId: req.tenantId!, // ← Associar ao tenant do usuário
+        empresaId: req.empresaId!,
       },
       include: {
-        supplier: true,
+        fornecedor: true,
       },
     });
 
@@ -88,20 +88,19 @@ router.put('/:id', authMiddleware, async (req, res) => {
   try {
     const data = productSchema.partial().parse(req.body);
 
-    // Verificar se produto pertence ao tenant antes de atualizar
-    const existing = await prisma.product.findFirst({
-      where: { id: req.params.id, tenantId: req.tenantId },
+    const existing = await prisma.produto.findFirst({
+      where: { id: req.params.id, empresaId: req.empresaId },
     });
 
     if (!existing) {
       return res.status(404).json({ error: 'Produto não encontrado' });
     }
 
-    const product = await prisma.product.update({
+    const product = await prisma.produto.update({
       where: { id: req.params.id },
       data,
       include: {
-        supplier: true,
+        fornecedor: true,
       },
     });
 
@@ -117,16 +116,15 @@ router.put('/:id', authMiddleware, async (req, res) => {
 // Deletar produto
 router.delete('/:id', authMiddleware, async (req, res) => {
   try {
-    // Verificar se produto pertence ao tenant antes de deletar
-    const existing = await prisma.product.findFirst({
-      where: { id: req.params.id, tenantId: req.tenantId },
+    const existing = await prisma.produto.findFirst({
+      where: { id: req.params.id, empresaId: req.empresaId },
     });
 
     if (!existing) {
       return res.status(404).json({ error: 'Produto não encontrado' });
     }
 
-    await prisma.product.delete({
+    await prisma.produto.delete({
       where: { id: req.params.id },
     });
 

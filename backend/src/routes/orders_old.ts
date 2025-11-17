@@ -6,16 +6,16 @@ import { authMiddleware, AuthRequest } from '../middlewares/auth';
 const router = Router();
 
 const orderSchema = z.object({
-  clienteId: z.string(),
-  vendedorId: z.string().optional(),
-  formaPagamento: z.string(),
-  venceEm: z.string().optional(),
-  observacoes: z.string().optional(),
+  clientId: z.string(),
+  sellerId: z.string().optional(),
+  paymentMethod: z.string(),
+  dueDate: z.string().optional(),
+  notes: z.string().optional(),
   items: z.array(
     z.object({
-      produtoId: z.string(),
-      quantidade: z.number().int().positive(),
-      preco: z.number().positive(),
+      productId: z.string(),
+      quantity: z.number().int().positive(),
+      price: z.number().positive(),
     })
   ),
 });
@@ -23,21 +23,21 @@ const orderSchema = z.object({
 // Listar pedidos
 router.get('/', authMiddleware, async (req: AuthRequest, res) => {
   try {
-    const orders = await prisma.pedido.findMany({
+    const orders = await prisma.order.findMany({
       where: {
-        empresaId: req.empresaId,
+        tenantId: req.tenantId, // ← Filtro por tenant
       },
       include: {
-        cliente: true,
-        vendedor: true,
-        itens: {
+        client: true,
+        seller: true,
+        items: {
           include: {
-            produto: true,
+            product: true,
           },
         },
       },
       orderBy: {
-        criadoEm: 'desc',
+        createdAt: 'desc',
       },
     });
 
@@ -50,17 +50,17 @@ router.get('/', authMiddleware, async (req: AuthRequest, res) => {
 // Buscar pedido por ID
 router.get('/:id', authMiddleware, async (req: AuthRequest, res) => {
   try {
-    const order = await prisma.pedido.findFirst({
+    const order = await prisma.order.findFirst({
       where: {
         id: req.params.id,
-        empresaId: req.empresaId,
+        tenantId: req.tenantId, // ← Garantir que o pedido pertence ao tenant
       },
       include: {
-        cliente: true,
-        vendedor: true,
-        itens: {
+        client: true,
+        seller: true,
+        items: {
           include: {
-            produto: true,
+            product: true,
           },
         },
       },
@@ -82,44 +82,43 @@ router.post('/', authMiddleware, async (req: AuthRequest, res) => {
     const data = orderSchema.parse(req.body);
 
     // Calcular total
-    const total = data.items.reduce((sum, item) => sum + item.preco * item.quantidade, 0);
-
-    // Gerar número do pedido
-    const lastOrder = await prisma.pedido.findFirst({
-      where: { empresaId: req.empresaId },
-      orderBy: { criadoEm: 'desc' },
+    let total = 0;
+    const items = data.items.map((item) => {
+      const subtotal = item.quantity * item.price;
+      total += subtotal;
+      return {
+        ...item,
+        subtotal,
+      };
     });
 
-    const orderNumber = lastOrder 
-      ? (parseInt(lastOrder.numeroPedido) + 1).toString().padStart(6, '0')
-      : '000001';
+    // Gerar número do pedido (por tenant)
+    const orderCount = await prisma.order.count({
+      where: { tenantId: req.tenantId },
+    });
+    const orderNumber = `PED${String(orderCount + 1).padStart(6, '0')}`;
 
-    const order = await prisma.pedido.create({
+    const order = await prisma.order.create({
       data: {
-        empresaId: req.empresaId!,
-        numeroPedido: orderNumber,
-        clienteId: data.clienteId,
-        vendedorId: data.vendedorId,
-        usuarioId: req.userId!,
-        formaPagamento: data.formaPagamento,
-        venceEm: data.venceEm ? new Date(data.venceEm) : null,
+        orderNumber,
+        tenantId: req.tenantId!, // ← Associar ao tenant
+        userId: req.userId!,
+        clientId: data.clientId,
+        sellerId: data.sellerId,
+        paymentMethod: data.paymentMethod,
+        dueDate: data.dueDate ? new Date(data.dueDate) : null,
+        notes: data.notes,
         total,
-        observacoes: data.observacoes,
-        itens: {
-          create: data.items.map((item) => ({
-            produtoId: item.produtoId,
-            quantidade: item.quantidade,
-            preco: item.preco,
-            subtotal: item.preco * item.quantidade,
-          })),
+        items: {
+          create: items,
         },
       },
       include: {
-        cliente: true,
-        vendedor: true,
-        itens: {
+        client: true,
+        seller: true,
+        items: {
           include: {
-            produto: true,
+            product: true,
           },
         },
       },
@@ -139,22 +138,24 @@ router.patch('/:id/status', authMiddleware, async (req: AuthRequest, res) => {
   try {
     const { status } = req.body;
 
-    const existing = await prisma.pedido.findFirst({
-      where: { id: req.params.id, empresaId: req.empresaId },
+    // Verificar se pedido pertence ao tenant antes de atualizar
+    const existing = await prisma.order.findFirst({
+      where: { id: req.params.id, tenantId: req.tenantId },
     });
 
     if (!existing) {
       return res.status(404).json({ error: 'Pedido não encontrado' });
     }
 
-    const order = await prisma.pedido.update({
+    const order = await prisma.order.update({
       where: { id: req.params.id },
       data: { status },
       include: {
-        cliente: true,
-        itens: {
+        client: true,
+        seller: true,
+        items: {
           include: {
-            produto: true,
+            product: true,
           },
         },
       },
@@ -162,7 +163,7 @@ router.patch('/:id/status', authMiddleware, async (req: AuthRequest, res) => {
 
     res.json(order);
   } catch (error) {
-    res.status(500).json({ error: 'Erro ao atualizar status' });
+    res.status(500).json({ error: 'Erro ao atualizar pedido' });
   }
 });
 

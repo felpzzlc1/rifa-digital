@@ -4,12 +4,12 @@ import jwt from 'jsonwebtoken';
 interface JwtPayload {
   userId: string;
   email: string;
-  tenantId: string; // ← NOVO!
+  empresaId: string;
 }
 
 export interface AuthRequest extends Request {
   userId?: string;
-  tenantId?: string; // ← NOVO!
+  empresaId?: string;
 }
 
 export const authMiddleware = (
@@ -26,7 +26,7 @@ export const authMiddleware = (
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as JwtPayload;
     req.userId = decoded.userId;
-    req.tenantId = decoded.tenantId; // ← NOVO!
+    req.empresaId = decoded.empresaId;
 
     next();
   } catch (error) {
