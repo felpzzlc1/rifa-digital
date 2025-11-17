@@ -1,0 +1,172 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      String   @default("user") // admin, seller, user
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  orders    Order[]
+  
+  @@map("users")
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  price       Float
+  stock       Int      @default(0)
+  image       String?
+  category    String?
+  barcode     String?
+  supplierId  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  supplier    Supplier?     @relation(fields: [supplierId], references: [id])
+  orderItems  OrderItem[]
+  routeProducts RouteProduct[]
+  
+  @@map("products")
+}
+
+model Client {
+  id        String   @id @default(uuid())
+  name      String
+  email     String?
+  phone     String?
+  address   String?
+  document  String?  @unique // CPF/CNPJ
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  orders    Order[]
+  routes    RouteClient[]
+  
+  @@map("clients")
+}
+
+model Seller {
+  id        String   @id @default(uuid())
+  name      String
+  email     String?  @unique
+  phone     String?
+  document  String?  @unique // CPF
+  commission Float   @default(0) // Percentual de comissão
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  orders    Order[]
+  routes    Route[]
+  
+  @@map("sellers")
+}
+
+model Supplier {
+  id        String   @id @default(uuid())
+  name      String
+  email     String?
+  phone     String?
+  address   String?
+  document  String?  @unique // CNPJ
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  products  Product[]
+  
+  @@map("suppliers")
+}
+
+model Order {
+  id            String   @id @default(uuid())
+  orderNumber   String   @unique
+  clientId      String
+  sellerId      String?
+  userId        String
+  status        String   @default("pending") // pending, completed, cancelled
+  paymentMethod String   // cash, credit, debit, pix
+  paymentStatus String   @default("pending") // pending, paid, overdue
+  dueDate       DateTime?
+  paidAt        DateTime?
+  total         Float
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  client        Client   @relation(fields: [clientId], references: [id])
+  seller        Seller?  @relation(fields: [sellerId], references: [id])
+  user          User     @relation(fields: [userId], references: [id])
+  items         OrderItem[]
+  
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String   @id @default(uuid())
+  orderId   String
+  productId String
+  quantity  Int
+  price     Float
+  subtotal  Float
+  
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id])
+  
+  @@map("order_items")
+}
+
+model Route {
+  id        String   @id @default(uuid())
+  name      String
+  color     String?
+  sellerId  String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  seller    Seller?  @relation(fields: [sellerId], references: [id])
+  clients   RouteClient[]
+  products  RouteProduct[]
+  
+  @@map("routes")
+}
+
+model RouteClient {
+  id        String   @id @default(uuid())
+  routeId   String
+  clientId  String
+  
+  route     Route    @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  
+  @@unique([routeId, clientId])
+  @@map("route_clients")
+}
+
+model RouteProduct {
+  id        String   @id @default(uuid())
+  routeId   String
+  productId String
+  
+  route     Route    @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  @@unique([routeId, productId])
+  @@map("route_products")
+}
