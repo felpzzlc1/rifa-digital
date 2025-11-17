@@ -2,7 +2,6 @@
 # Railway usa Nixpacks, não Docker
 
 # Docker (mantido apenas para dev local)
-Dockerfile
 docker-compose.yml
 nginx.conf
 
